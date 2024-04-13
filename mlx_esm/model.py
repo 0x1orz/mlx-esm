@@ -31,23 +31,24 @@ class Embedding(nn.Module):
     self.vocab_size = vocab_size
     self.scale = scale or math.sqrt(1 / embed_dims)
     self.pad_idx = pad_idx
-
-    self.weight = mx.random.normal([vocab_size, embed_dims]) * self.scale
-
-    # The entries at pad_idx do not contribute to the gradient, so
-    # the embedding vector at pad_idx will default to all zeros.
-    #
-    # TODO: Unclear how to disable updating the embedding vector at pad_idx
-    # during training. In PyTorch, this seems to be implemented in C-level code.
-    # See: https://github.com/pytorch/pytorch/blob/b85568a54a9c60986235ad1e0cc5dffc71b9d5b1/aten/src/ATen/native/Embedding.cpp#L108
-    if self.pad_idx is not None:
-      self.weight[self.pad_idx] = 0
+    
+    if self.pad_idx is None:
+      self.weight = mx.random.normal([vocab_size, embed_dims]) * self.scale
+      self._weight = self.weight
+    else:
+      # The entries at pad_idx do not contribute to the gradient, so
+      # the embedding vector at pad_idx will default to all zeros.
+      # padding token "<pad>" lists before standard_toks after "<null_0>".
+      _pad_zeros = mx.zeros((1, embed_dims))
+      self.weight = mx.random.normal([vocab_size + 1, embed_dims]) * self.scale
+      # the key startwiths "_" will be filtered out of the trainable parameters by `valid_parameter_filter`.
+      self._weight = mx.concatenate([self.weight[:self.pad_idx, :], _pad_zeros, self.weight[self.pad_idx:, :]], axis=0)
 
   def __call__(self, x: mx.array) -> mx.array:
     # x: (B x L)
     # W: (V x C)
     # y: (B x L x C)
-    y = self.weight[x]
+    y = self._weight[x]
 
     return y
 

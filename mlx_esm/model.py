@@ -182,8 +182,8 @@ class MultiHeadAttention(nn.Module):
     queries = queries * scale
 
     kv = self.kv_proj(mx.concatenate([keys, values]))
-    keys = kv[:self.vdims, :]
-    values = kv[self.vdims, :]
+    keys = kv[:, :self.vdims, :]
+    values = kv[:, self.vdims, :]
 
     _, S, _ = keys.shape
     K = C // H

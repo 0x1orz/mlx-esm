@@ -162,16 +162,12 @@ class MultiHeadAttention(nn.Module):
     self.num_heads = num_heads
     self.bias = bias
 
-    # TODO: implement adding bias to the key and value projections
-    self.add_bias_kv = add_bias_kv
-
     # We use the same dimensions for queries, keys & values.
     qdims = embed_dims
     kdims = embed_dims
-    vdims = embed_dims
+    self.vdims = embed_dims
 
-    self.k_proj = nn.Linear(kdims, embed_dims, bias=bias)
-    self.v_proj = nn.Linear(vdims, embed_dims, bias=bias)
+    self.kv_proj = nn.Linear(kdims + self.vdims, embed_dims, bias=add_bias_kv)
     self.q_proj = nn.Linear(qdims, embed_dims, bias=bias)
     self.out_proj = nn.Linear(embed_dims, embed_dims, bias=bias)
 
@@ -185,8 +181,9 @@ class MultiHeadAttention(nn.Module):
     scale = math.sqrt(1.0 / C)
     queries = queries * scale
 
-    keys = self.k_proj(keys)
-    values = self.v_proj(values)
+    kv = self.kv_proj(mx.concatenate([keys, values]))
+    keys = kv[:self.vdims, :]
+    values = kv[self.vdims, :]
 
     _, S, _ = keys.shape
     K = C // H
